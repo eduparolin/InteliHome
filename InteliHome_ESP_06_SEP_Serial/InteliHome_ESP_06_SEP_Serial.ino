@@ -8,19 +8,16 @@ unsigned long prev = 0; // last time update
 long intervalo = 30000;
 int ff = 1;
 int calibration = 0;
+int ndelay = 0;
 int ledStatus = 0;
-//const char ap_ssid[] PROGMEM = {"InteliHome"};
-//const char ap_pass[] PROGMEM = {"12345678"};
 int mode = 0;
 int ligado = LOW;
 unsigned long csSum;
 String nome = "", password = "";
-//#include <string.h>
 
 //#--------SETUP-------#//
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(19200);
   Serial1.begin(19200);
   pinMode(A1, OUTPUT);
@@ -86,8 +83,14 @@ void CSread() {
   }
   if (cs > 30) { //b: Arbitrary number
     csSum += cs;
+    int dl;
+    if(ndelay==0){
+      dl = 120;
+    }else{
+      dl = ndelay;
+    }
     //Serial.println(cs);
-    if (csSum >= 120) //c: This value is the threshold, a High value means it takes longer to trigger
+    if (csSum >= dl) //c: This value is the threshold, a High value means it takes longer to trigger
     {
       ff = 1;
       //Serial.print("Trigger: ");
@@ -247,11 +250,19 @@ void oneCom() {
   }
   index = response.indexOf("/c");
   if (index != -1) {
-    String newCali = "";
+    int pos = 0;
+    String newSense = "";
+    String newDelay = "";
     for (int i = index + 2; response[i] != '&'; i++) {
-      newCali += response[i];
+      newSense += response[i];
+      pos=i;
     }
-    calibration = newCali.toInt();
+    calibration = newSense.toInt();
+    for (int i = pos + 2; response[i] != '&'; i++) {
+      newDelay += response[i];
+      //pos=i;
+    }
+    ndelay = newDelay.toInt();
   }
   if (id != 'N') {
     resp += ledStatus;
