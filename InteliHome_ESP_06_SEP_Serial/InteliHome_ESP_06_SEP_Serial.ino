@@ -121,7 +121,7 @@ void CSread() {
 
 String simpleCom(const __FlashStringHelper* comm, int timeout) {
   Serial.print(comm);
-  delay(5);
+  delay(7);
   String response = "";
   long int time = millis();
   while ( (time + timeout) > millis()) {
@@ -160,11 +160,15 @@ void zeroCom() {
     nome = "";
     password = "";
     int pos = 0;
+    long safety = millis();
     for (int i = index + 2; response[i] != '&'; i++) {
+      if(millis()-safety>500)break;
       nome += response[i];
       pos = i;
     }
+    safety = millis();
     for (int i = pos + 2; response[i] != '&'; i++) {
+      if(millis()-safety>500)break;
       password += response[i];
     }
     //getAddr();
@@ -253,12 +257,16 @@ void oneCom() {
     int pos = 0;
     String newSense = "";
     String newDelay = "";
+    long safety = millis();
     for (int i = index + 2; response[i] != '&'; i++) {
+      if(millis()-safety>500)break;
       newSense += response[i];
       pos=i;
     }
+    safety = millis();
     calibration = newSense.toInt();
     for (int i = pos + 2; response[i] != '&'; i++) {
+      if(millis()-safety>500)break;
       newDelay += response[i];
       //pos=i;
     }
