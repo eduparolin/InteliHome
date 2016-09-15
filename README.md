@@ -1,3 +1,3 @@
 # InteliHome
 Controle de versão para Arduino.
-Versão 1.0.0.
+Versão 1.1.0.

@@ -11,6 +11,8 @@ int calibration = 0;
 int ndelay = 0;
 int ledStatus = 0;
 int mode = 0;
+String code = "";
+int randNumber = 0;
 int ligado = LOW;
 unsigned long csSum;
 String nome = "", password = "";
@@ -32,6 +34,7 @@ void setup() {
     simpleCom(F("AT+CWMODE=3\r\n"), 500);
     simpleCom(F("AT+CWSAP_CUR=\"InteliHome\",\"12345678\",10,3\r\n"), 2000);
   } else if (mode == 1) {
+    code = EEPROMReadlong(1);
     simpleCom(F("AT+CWMODE=1\r\n"), 7500);
   }
   delay(100);
@@ -84,9 +87,9 @@ void CSread() {
   if (cs > 30) { //b: Arbitrary number
     csSum += cs;
     int dl;
-    if(ndelay==0){
+    if (ndelay == 0) {
       dl = 120;
-    }else{
+    } else {
       dl = ndelay;
     }
     //Serial.println(cs);
@@ -162,13 +165,13 @@ void zeroCom() {
     int pos = 0;
     long safety = millis();
     for (int i = index + 2; response[i] != '&'; i++) {
-      if(millis()-safety>500)break;
+      if (millis() - safety > 500)break;
       nome += response[i];
       pos = i;
     }
     safety = millis();
     for (int i = pos + 2; response[i] != '&'; i++) {
-      if(millis()-safety>500)break;
+      if (millis() - safety > 500)break;
       password += response[i];
     }
     //getAddr();
@@ -202,8 +205,14 @@ void getAddr(char id) {
     for (int i = index + 7; response[i] != '\"'; i++) {
       ip += response[i];
     }
+  } while (randNumber < 100) {
+    randomSeed(analogRead(0));
+    randNumber = random(300);
   }
-  closeRespCom(id, ip);
+  EEPROMWritelong(1, randNumber);
+  code = String(randNumber);
+  //Serial.println(randNumber);
+  closeRespCom(id, ip + "+" + String(randNumber));
   mode = 0;
 }
 
@@ -240,33 +249,33 @@ void oneCom() {
   if (index != -1) {
     id = response[index + 5];
   }
-  index = response.indexOf("/H");
+  index = response.indexOf("/H" + code);
   if (index != -1) {
     ledStatus = 1;
     ff = 0;
     digitalWrite(A1, ledStatus);
   }
-  index = response.indexOf("/L");
+  index = response.indexOf("/L" + code);
   if (index != -1) {
     ff = 0;
     ledStatus = 0;
     digitalWrite(A1, ledStatus);
   }
-  index = response.indexOf("/c");
+  index = response.indexOf("/c" + code);
   if (index != -1) {
     int pos = 0;
     String newSense = "";
     String newDelay = "";
     long safety = millis();
-    for (int i = index + 2; response[i] != '&'; i++) {
-      if(millis()-safety>500)break;
+    for (int i = index + 5; response[i] != '&'; i++) {
+      if (millis() - safety > 500)break;
       newSense += response[i];
-      pos=i;
+      pos = i;
     }
     safety = millis();
     calibration = newSense.toInt();
     for (int i = pos + 2; response[i] != '&'; i++) {
-      if(millis()-safety>500)break;
+      if (millis() - safety > 500)break;
       newDelay += response[i];
       //pos=i;
     }
@@ -297,6 +306,34 @@ void closeRespCom(char id, String resp) {
   simpleCom(F("AT+CIPCLOSE="), 250);
   Serial.print(id);
   simpleCom(F("\r\n"), 250);
+}
+
+void EEPROMWritelong(int address, long value)
+{
+  //Decomposition from a long to 4 bytes by using bitshift.
+  //One = Most significant -> Four = Least significant byte
+  byte four = (value & 0xFF);
+  byte three = ((value >> 8) & 0xFF);
+  byte two = ((value >> 16) & 0xFF);
+  byte one = ((value >> 24) & 0xFF);
+
+  //Write the 4 bytes into the eeprom memory.
+  EEPROM.write(address, four);
+  EEPROM.write(address + 1, three);
+  EEPROM.write(address + 2, two);
+  EEPROM.write(address + 3, one);
+}
+
+long EEPROMReadlong(long address)
+{
+  //Read the 4 bytes from the eeprom memory.
+  long four = EEPROM.read(address);
+  long three = EEPROM.read(address + 1);
+  long two = EEPROM.read(address + 2);
+  long one = EEPROM.read(address + 3);
+
+  //Return the recomposed long by using bitshift.
+  return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
 
 /*//#--------Verifica memória ram-------#//
