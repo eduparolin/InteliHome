@@ -65,7 +65,7 @@ char checkCon() {
   char stats = '0';
   if (cur - prev > intervalo) {
     prev = cur;
-    String status = simpleCom(F("AT+CIPSTATUS\r\n"), 500);
+    String status = simpleCom(F("AT+CIPSTATUS\r\n"), 350);
     int index = status.indexOf("STATUS:");
     stats = status[index + 7];
   } return stats;
@@ -220,7 +220,7 @@ void createSTA(String nome1, String pass) {
 //#--------Pedididos de modo 1 (Depois de configurado)-------#//
 
 void oneCom() {
-  int timeout = 180;
+  int timeout = 50;
   int count = 0;
   String response = "";
   long int time = millis();
