@@ -229,7 +229,7 @@ void createSTA(String nome1, String pass) {
 //#--------Pedididos de modo 1 (Depois de configurado)-------#//
 
 void oneCom() {
-  int timeout = 50;
+  int timeout = 30;
   int count = 0;
   String response = "";
   long int time = millis();
