@@ -1,12 +1,3 @@
-/*
-    This sketch demonstrates how to set up a simple HTTP-like server.
-    The server will set a GPIO pin depending on the request
-      http://server_ip/gpio/0 will set the GPIO2 low,
-      http://server_ip/gpio/1 will set the GPIO2 high
-    server_ip is the IP address of the ESP8266 module, will be
-    printed to Serial when the module is connected.
-*/
-
 #include <ESP8266WiFi.h>
 #include <EEPROM.h>
 const char* ssid = "InteliHome";
@@ -16,14 +7,13 @@ int randNumber = 0;
 int modo = 0;
 int val = 0;
 String teste = "";
+int maxDelay = 30000;
 
 String ipToString(IPAddress ip);
 void EEPROMWritelong(int address, long value);
 long EEPROMReadlong(long address);
 void storeSSID(String ss, String pass);
 
-// Create an instance of the server
-// specify the port to listen on as an argument
 WiFiServer server(5566);
 
 void setup() {
@@ -33,7 +23,7 @@ void setup() {
   //EEPROM.commit();
   delay(10);
   pinMode(2, OUTPUT);
-  digitalWrite(2, 0);
+  digitalWrite(2, LOW);
   if (EEPROM.read(0) == '0')modo = 0;
   if (EEPROM.read(0) == '1')modo = 1;
   randNumber = EEPROMReadlong(1);
@@ -59,14 +49,32 @@ void setup() {
     }
 
     /*Serial.println();
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(ss.c_str());*/
+      Serial.println();
+      Serial.print("Connecting to ");
+      Serial.println(ss.c_str());*/
 
     WiFi.begin(ss.c_str(), pass.c_str());
-
+    int times = millis();
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
+      if (Serial.available()) {
+        String check = "";
+        char c = Serial.read();
+        check += c;
+        if (check == "Z") {
+          EEPROM.write(0, '0');
+          EEPROM.commit();
+          ESP.restart();
+          break;
+        }
+        check = "";
+      }
+      if (millis() - times > maxDelay) {
+        EEPROM.write(0, '0');
+        EEPROM.commit();
+        ESP.restart();
+        break;
+      }
       //Serial.print(".");
     }
     //Serial.println("");
@@ -82,7 +90,7 @@ void setup() {
 }
 
 void loop() {
-
+  int modo_n = modo;
   // Check if a client has connected
   WiFiClient client = server.available();
   if (!client) {
@@ -104,10 +112,10 @@ void loop() {
       teste = "";
     }
     if (teste == "Z") {
-      EEPROM.write(0,'0');
+      EEPROM.write(0, '0');
       EEPROM.commit();
       ESP.restart();
-      teste="";
+      teste = "";
     }
     return;
   }
@@ -139,36 +147,42 @@ void loop() {
 
       //WiFi.mode(WIFI_STA);
       WiFi.begin(ssid, password);
-
+      int times = millis();
       while (WiFi.status() != WL_CONNECTED) {
         delay(500);
+        if (millis() - times > maxDelay) {
+          modo_n = 10;
+          break;
+        }
         //Serial.print(".");
       }
       //Serial.println("");
       //Serial.println("WiFi connected");
-      delay(10);
-      client.flush();
-      randomSeed(millis());
-      randNumber = random(100, 999);
-      String s = "";
-      s += ipToString(WiFi.localIP());
-      s += "+";
-      s += String(randNumber);
-      s += "+";
-      s += String(1);
-      s += "\n";
-      client.print(s);
-      delay(1);
-      WiFi.mode(WIFI_STA);
-      //Serial.println("");
-      //Serial.println("Recriando servidor na porta 5566...");
-      server.begin();
-      //Serial.println("Servidor rodando!");
-      modo = 1;
-      EEPROM.write(0, '1');
-      EEPROM.commit();
-      EEPROMWritelong(1, randNumber);
-      storeSSID(ssid, password);
+      if (modo_n == 0) {
+        delay(10);
+        client.flush();
+        randomSeed(millis());
+        randNumber = random(100, 999);
+        String s = "";
+        s += ipToString(WiFi.localIP());
+        s += "+";
+        s += String(randNumber);
+        s += "+";
+        s += String(1);
+        s += "\n";
+        client.print(s);
+        delay(1);
+        WiFi.mode(WIFI_STA);
+        //Serial.println("");
+        //Serial.println("Recriando servidor na porta 5566...");
+        server.begin();
+        //Serial.println("Servidor rodando!");
+        modo = 1;
+        EEPROM.write(0, '1');
+        EEPROM.commit();
+        EEPROMWritelong(1, randNumber);
+        storeSSID(ssid, password);
+      }
 
     }
     else {
@@ -180,11 +194,11 @@ void loop() {
   // Match the request
 
   if (modo == 1) {
-    if (req.indexOf("/L" + String(randNumber)) != -1){
-    Serial.println("L");
+    if (req.indexOf("/L" + String(randNumber)) != -1) {
+      Serial.println("L");
       val = 0;
     }
-    else if (req.indexOf("/H" + String(randNumber)) != -1){
+    else if (req.indexOf("/H" + String(randNumber)) != -1) {
       Serial.println("H");
       val = 1;
     }
@@ -210,7 +224,7 @@ void loop() {
         newDelay += req[i];
         //pos=i;
       }
-      Serial.println("&" + newSense+"&"+newDelay+"&");
+      Serial.println("&" + newSense + "&" + newDelay + "&");
       //Serial.println("Tempo: " + newDelay);
       //ndelay = newDelay.toInt();
     }
@@ -259,10 +273,7 @@ String ipToString(IPAddress ip) {
   return s;
 }
 
-void EEPROMWritelong(int address, long value)
-{
-  //Decomposition from a long to 4 bytes by using bitshift.
-  //One = Most significant -> Four = Least significant byte
+void EEPROMWritelong(int address, long value) {
   byte four = (value & 0xFF);
   byte three = ((value >> 8) & 0xFF);
   byte two = ((value >> 16) & 0xFF);
@@ -275,15 +286,12 @@ void EEPROMWritelong(int address, long value)
   EEPROM.write(address + 3, one);
   EEPROM.commit();
 }
-long EEPROMReadlong(long address)
-{
-  //Read the 4 bytes from the eeprom memory.
+long EEPROMReadlong(long address) {
   long four = EEPROM.read(address);
   long three = EEPROM.read(address + 1);
   long two = EEPROM.read(address + 2);
   long one = EEPROM.read(address + 3);
 
-  //Return the recomposed long by using bitshift.
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
 
