@@ -72,7 +72,6 @@ char checkCon() {
     int index = status.indexOf("STATUS:");
     stats = status[index + 7];
   } return stats;
-
 }
 
 //#--------Espera por clique touch-------#//
