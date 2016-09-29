@@ -1,3 +1,4 @@
+
 #include <ESP8266WiFi.h>
 #include <EEPROM.h>
 const char* ssid = "InteliHome";
@@ -8,6 +9,8 @@ int modo = 0;
 int val = 0;
 String teste = "";
 int maxDelay = 30000;
+unsigned long prev = 0; // last time update
+long intervalo = 120000;
 
 String ipToString(IPAddress ip);
 void EEPROMWritelong(int address, long value);
@@ -83,10 +86,10 @@ void setup() {
   }
   // Start the server
   server.begin();
-  //Serial.println("Server started");
+  Serial.println("Server started");
 
   // Print the IP address
-  //Serial.println(WiFi.localIP());
+  Serial.println(WiFi.localIP());
 }
 
 void loop() {
@@ -102,12 +105,12 @@ void loop() {
       //Serial.println(teste);
     }
     if (teste == "H") {
-      val = 1;
+      val = 0;
       digitalWrite(2, val);
       teste = "";
     }
     if (teste == "L") {
-      val = 0;
+      val = 1;
       digitalWrite(2, val);
       teste = "";
     }
@@ -149,6 +152,7 @@ void loop() {
       WiFi.begin(ssid, password);
       int times = millis();
       while (WiFi.status() != WL_CONNECTED) {
+        //Serial.print(".");
         delay(500);
         if (millis() - times > maxDelay) {
           modo_n = 10;
@@ -194,17 +198,21 @@ void loop() {
   // Match the request
 
   if (modo == 1) {
+    checkCon();
     if (req.indexOf("/L" + String(randNumber)) != -1) {
       Serial.println("L");
-      val = 0;
+      val = 1;
     }
     else if (req.indexOf("/H" + String(randNumber)) != -1) {
       Serial.println("H");
-      val = 1;
+      val = 0;
     }
     else if (req.indexOf("/rst" + String(randNumber)) != -1) {
       EEPROM.write(0, '0');
       EEPROM.commit();
+    }
+    else if (req.indexOf("/DE" + String(randNumber)) != -1) {
+      Serial.println("C");
     }
     else if (req.indexOf("/c" + String(randNumber)) != -1) {
       int index = req.indexOf("/c" + String(randNumber));
@@ -242,7 +250,7 @@ void loop() {
     // Prepare the response
     //HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\n
     String s = "";
-    s += (val) ? "1" : "0";
+    s += (val) ? "0" : "1";
     //s += "</html>\n";
 
     // Send the response to the client
@@ -250,6 +258,15 @@ void loop() {
     delay(1);
     //Serial.println("Client disonnected");
 
+  }
+  
+}
+void checkCon() {
+  unsigned long cur = millis();
+  char stats = '0';
+  if (cur - prev > intervalo) {
+    prev = cur;
+    if(WiFi.status() != WL_CONNECTED)ESP.restart();
   }
 }
 

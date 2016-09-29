@@ -1,79 +1,73 @@
 #include <CapacitiveSensor.h>
 #include <SoftwareSerial.h>
+
+//Tamanho do buffer do serial.
+#define SERIAL_BUFFER 16
+char input[SERIAL_BUFFER + 1];
+
 int ff = 1;
 int ledStatus = 0;
 int ligado = LOW;
+
+int calib[2];//calib: pos0 = Sensibilidade; pos1 = Delay;
 unsigned long csSum;
-String teste = "";
-int calibration = 0;
-int ndelay = 0;
-CapacitiveSensor c = CapacitiveSensor(1, 2);
-SoftwareSerial Serial1(3, 4);
+
+CapacitiveSensor c = CapacitiveSensor(1, 2);//(Antena, Referência);
+SoftwareSerial Serial1(3, 4);//(RX,TX);
+
 void setup() {
-  // put your setup code here, to run once:
   Serial1.begin(9600);
   pinMode(0, INPUT);
+  //Zerando as posições de calib;
+  for (int i = 0; i < 2; i++) {
+    calib[i] = 0;
+  }
 }
 
 void loop() {
   CSread();
-  delay(5);
+  //delay(1);
+  //Lê os possíveis comandos de serial;
   if (Serial1.available()) {
-    teste = "";
-    while (Serial1.available()) {
-      char c = char(Serial1.read());
-      teste += c;
-      delay(1);
-    }
-    //Serial1.println(teste);
-    int index = teste.indexOf("&");
-    if (index != -1) {
-      int pos = 0;
-      String newSense = "";
-      String newDelay = "";
-      long safety = millis();
-      for (int i = index + 1; teste[i] != '&'; i++) {
-        if (millis() - safety > 500)break;
-        newSense += teste[i];
-        pos = i;
-      }
-      safety = millis();
-      calibration = newSense.toInt();
-      for (int i = pos + 2; teste[i] != '&'; i++) {
-        if (millis() - safety > 500)break;
-        newDelay += teste[i];
-      }
-      ndelay = newDelay.toInt();
-      //Serial1.println(newSense+" - "+newDelay);
-    }
-    if (teste.indexOf("H") != -1) {
+    char *teste;
+    byte tam = Serial1.readBytes(input, SERIAL_BUFFER);
+    if (input[0] == 'H') {
+      //Luz ligada;
       ligado = HIGH;
-    }
-    if (teste.indexOf("L") != -1) {
+    } else if (input[0] == 'L') {
+      //Luz desligada;
       ligado = LOW;
+    } else {
+      //Lê as mudanças de sensibilidade do touch;
+      teste = strtok(input, "&");
+      int count = 0;
+      while (teste != 0) {
+        calib[count] = atoi(teste);
+        Serial1.println(calib[count]);
+        teste = strtok(NULL, "&");
+        count++;
+      }
     }
-
   }
+  //Manda comando reset para ESP quando o pino 0 for HIGH;
   if (digitalRead(0) == HIGH) {
-    //EEPROM.write(0, '0');
-    //resetFunc();
     Serial1.println("Z");
   }
 }
 void CSread() {
   long cs;
-  if (calibration != 0) {
-    cs = c.capacitiveSensor(calibration);
+  if (calib[0] != 0) {
+    cs = c.capacitiveSensor(calib[0]);
   } else {
     cs = c.capacitiveSensor(30); //a: Sensor resolution is set to 80
   } //a: Sensor resolution is set to 80
   if (cs > 30) { //b: Arbitrary number
     csSum += cs;
     int dl;
-    if (ndelay == 0) {
+    if (calib[1] == 0) {
       dl = 120;
     } else {
-      dl = ndelay;
+      dl = calib[1];
     }
     if (csSum >= dl) //c: This value is the threshold, a High value means it takes longer to trigger
     {

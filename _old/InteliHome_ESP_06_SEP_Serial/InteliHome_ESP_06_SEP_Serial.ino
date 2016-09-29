@@ -44,15 +44,15 @@ void setup() {
 //#--------LOOP-------#//
 
 void loop() {
+  CSread();
   void(* resetFunc) (void) = 0;
   if (mode == 0) {
     zeroCom();
   } else if (mode == 1) {
     //simpleCom("", 500);
-    CSread();
     oneCom();
     if (checkCon() == '5') {
-      resetFunc();
+      resetFunc(); 
     }
   }
   if (digitalRead(12) == HIGH) {
