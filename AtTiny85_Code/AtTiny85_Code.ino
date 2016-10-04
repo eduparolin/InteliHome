@@ -1,8 +1,7 @@
 #include <CapacitiveSensor.h>
 #include <SoftwareSerial.h>
 
-//Tamanho do buffer do serial.
-#define SERIAL_BUFFER 16
+#define SERIAL_BUFFER 10
 char input[SERIAL_BUFFER + 1];
 
 int ff = 1;
@@ -58,14 +57,14 @@ void CSread() {
   long cs;
   if (calib[0] != 0) {
     cs = c.capacitiveSensor(calib[0]);
-  } else {
+  } else { 
     cs = c.capacitiveSensor(30); //a: Sensor resolution is set to 80
   } //a: Sensor resolution is set to 80
   if (cs > 30) { //b: Arbitrary number
     csSum += cs;
     int dl;
     if (calib[1] == 0) {
-      dl = 120;
+      dl = 150;
     } else {
       dl = calib[1];
     }

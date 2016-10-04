@@ -5,7 +5,6 @@ SoftwareSerial Serial1(8, 7);
 #define SERIAL_SIZE 16
 int ff = 1;
 int ledStatus = 0;
-int ligado = LOW;
 unsigned long csSum;
 int calib[2];
 char input[SERIAL_SIZE + 1];
@@ -13,6 +12,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial1.begin(9600);
   Serial.begin(9600);
+  Serial.println("Iniciando");
   pinMode(A1, OUTPUT);
   pinMode(12, INPUT);
   for (int i = 0; i < 2; i++) {
@@ -28,7 +28,7 @@ void loop() {
     if (input[0] == 'H') {
       //Serial.println("HIGH");
       digitalWrite(A1, HIGH);
-      ledStatus = HIGH; 
+      ledStatus = HIGH;
     } else if (input[0] == 'L') {
       digitalWrite(A1, LOW);
       ledStatus = LOW;
@@ -37,14 +37,13 @@ void loop() {
       int count = 0;
       while (teste != 0) {
         calib[count] = atoi(teste);
-        //Serial.println(calib[count]);
         teste = strtok(NULL, "&");
         count++;
       }
     }
   }
   if (digitalRead(12) == HIGH) {
-    Serial.println("Z");
+    Serial.println('Z');
   }
   // put your main code here, to run repeatedly:
 
@@ -64,26 +63,19 @@ void CSread() {
     } else {
       dl = calib[1];
     }
-    if (csSum >= dl) //c: This value is the threshold, a High value means it takes longer to trigger
-    {
+    if (csSum >= dl) {
       ff = 1;
-      if (csSum > 0) {
-        csSum = 0;
-        if (ligado == LOW && ff == 1) {
-          ligado = HIGH;
-          ledStatus = HIGH;
-          ff = 0;
-          digitalWrite(A1, ledStatus);
-          //Serial.println("H");
-        }
-        if (ligado == HIGH && ff == 1) {
-          ligado = LOW;
-          ff = 0;
-          ledStatus = LOW;
-          digitalWrite(A1, ledStatus);
-          //Serial.println("L");
-        }
-      } //Reset
+      csSum = 0;
+      if (ledStatus == LOW && ff == 1) {
+        ledStatus = HIGH;
+        ff = 0;
+        digitalWrite(A1, ledStatus);
+      }
+      if (ledStatus == HIGH && ff == 1) {
+        ff = 0;
+        ledStatus = LOW;
+        digitalWrite(A1, ledStatus);
+      }
       c.reset_CS_AutoCal();
     }
   } else {

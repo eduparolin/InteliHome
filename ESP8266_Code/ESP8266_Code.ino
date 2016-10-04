@@ -1,5 +1,4 @@
-
-#include <ESP8266WiFi.h>
+6#include <ESP8266WiFi.h>
 #include <EEPROM.h>
 const char* ssid = "InteliHome";
 const char* password = "12345678";
@@ -10,7 +9,7 @@ int val = 0;
 String teste = "";
 int maxDelay = 30000;
 unsigned long prev = 0; // last time update
-long intervalo = 120000;
+long intervalo = 120000, intervalo_send = 15000;
 
 String ipToString(IPAddress ip);
 void EEPROMWritelong(int address, long value);
@@ -20,25 +19,25 @@ void storeSSID(String ss, String pass);
 WiFiServer server(5566);
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(57600);
   EEPROM.begin(512);
   //EEPROM.write(0,'0');
   //EEPROM.commit();
   delay(10);
   pinMode(2, OUTPUT);
   digitalWrite(2, LOW);
-  if (EEPROM.read(0) == '0')modo = 0;
-  if (EEPROM.read(0) == '1')modo = 1;
-  randNumber = EEPROMReadlong(1);
+  //if (EEPROM.read(0) == '0')modo = 0;
+  //if (EEPROM.read(0) == '1')modo = 1;
+  //randNumber = EEPROMReadlong(1);
   if (modo == 0) {
     WiFi.mode(WIFI_AP_STA);
-    //Serial.println();
-    //Serial.print("Configuring access point...");
+    Serial.println();
+    Serial.print("Configuring access point...");
     WiFi.softAP(ssid, password);
 
     IPAddress myIP = WiFi.softAPIP();
-    //Serial.print("AP IP address: ");
-    //Serial.println(myIP);
+    Serial.print("AP IP address: ");
+    Serial.println(myIP);
   } else {
     // prepare GPIO2
     // Connect to WiFi network
@@ -89,7 +88,7 @@ void setup() {
   Serial.println("Server started");
 
   // Print the IP address
-  Serial.println(WiFi.localIP());
+  //Serial.println(WiFi.localIP());
 }
 
 void loop() {
@@ -122,6 +121,7 @@ void loop() {
     }
     return;
   }
+  Serial.println("-----New connection-----");
 
   // Wait until the client sends some data
   //Serial.println("new client");
@@ -129,11 +129,21 @@ void loop() {
     delay(1);
   }
   // Read the first line of the request
-  String req = client.readStringUntil('\r');
-  //Serial.println(req);
+  //String req = client.readStringUntil('\r');
+  char input[32];
+  byte tam = client.readBytes(input, 31);
+  char *teste;
+  Serial.println(input);
   client.flush();
   if (modo == 0) {
-    int index = req.indexOf("/&");
+    char *nssid, *npassword;
+    teste = strtok(input, "&");
+    strcpy(nssid, teste);
+    Serial.println(ssid);
+    teste= strtok(NULL, "&");
+    strcpy(npassword, teste);
+    Serial.println(password);
+    /*int index = req.indexOf("/&");
     if (index != -1) {
       ssid = "";
       password = "";
@@ -144,7 +154,8 @@ void loop() {
       }
       for (int i = pos + 2; req[i] != '&'; i++) {
         password += req[i];
-      }
+      }*/
+      
 
       //server.stop();
 
@@ -197,7 +208,8 @@ void loop() {
   }
   // Match the request
 
-  if (modo == 1) {
+  /*if (modo == 1) {
+    sendCon();
     checkCon();
     if (req.indexOf("/L" + String(randNumber)) != -1) {
       Serial.println("L");
@@ -208,7 +220,7 @@ void loop() {
       val = 0;
     }
     else if (req.indexOf("/rst" + String(randNumber)) != -1) {
-      EEPROM.write(0, '0');
+      EEPROM.write(0, '0'); 
       EEPROM.commit();
     }
     else if (req.indexOf("/DE" + String(randNumber)) != -1) {
@@ -232,7 +244,7 @@ void loop() {
         newDelay += req[i];
         //pos=i;
       }
-      Serial.println("&" + newSense + "&" + newDelay + "&");
+      Serial.println(newSense + "&" + newDelay);
       //Serial.println("Tempo: " + newDelay);
       //ndelay = newDelay.toInt();
     }
@@ -258,15 +270,31 @@ void loop() {
     delay(1);
     //Serial.println("Client disonnected");
 
-  }
+  }*/
   
-}
+//}
 void checkCon() {
   unsigned long cur = millis();
   char stats = '0';
   if (cur - prev > intervalo) {
     prev = cur;
     if(WiFi.status() != WL_CONNECTED)ESP.restart();
+  }
+}
+void sendCon() {
+  unsigned long cur = millis();
+  char stats = '0';
+  if (cur - prev > intervalo_send) {
+    prev = cur;
+    WiFiClient sender;
+    if (!sender.connect("192.168.25.18", 5566)) {
+    Serial.println("connection failed");
+    return;
+  }
+  String url = "Hello World";
+  sender.print(url);
+  sender.stop();
+    //if(WiFi.status() != WL_CONNECTED)ESP.restart();
   }
 }
 
