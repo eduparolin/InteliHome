@@ -1,18 +1,10 @@
-/*
-    This sketch demonstrates how to set up a simple HTTP-like server.
-    The server will set a GPIO pin depending on the request
-      http://server_ip/gpio/0 will set the GPIO2 low,
-      http://server_ip/gpio/1 will set the GPIO2 high
-    server_ip is the IP address of the ESP8266 module, will be
-    printed to Serial when the module is connected.
-*/
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 String ip = "";
 String resp = "";
 String teste = "";
 
-int val = 0;
+int val = 1;
 
 const char* ssid = "InteliHome";
 const char* password = "12345678";
@@ -26,7 +18,7 @@ String npassword = "";
 
 int modo = 0;
 
-const char* host = "intelihome.redirectme.net";
+const char* host = "192.168.25.18";
 
 unsigned long prev = 0; // last time update
 long intervalo = 120000;
@@ -51,7 +43,7 @@ void sendCom() {
   }
   String url = String(randNumber);
   url += " - ";
-  url += (val) ? "1" : "0";
+  url += (val) ? "0" : "1";
   sender.print(url);
   sender.stop();
 }
@@ -123,8 +115,9 @@ void setup() {
   if (EEPROM.read(0) == (char)'1')modo = 1;
 
   // prepare GPIO2
-  //pinMode(2, OUTPUT);
-  //digitalWrite(2, 0);
+  pinMode(2, OUTPUT);
+  val = 1;
+  digitalWrite(2, val);
 
   // Connect to WiFi network
   if (modo == 0) {
@@ -170,8 +163,19 @@ void loop() {
       while (Serial.available()) {
         teste += char(Serial.read());
       }
-      //Serial.println(teste);
-    } if (teste == "Z") {
+    }
+    //Serial.println(teste);
+    if (teste == "H") {
+      val = 0;
+      digitalWrite(2, val);
+      teste = "";
+    }
+    if (teste == "L") {
+      val = 1;
+      digitalWrite(2, val);
+      teste = "";
+    }
+    if (teste == "Z") {
       EEPROM.write(0, '0');
       EEPROM.commit();
       ESP.restart();
@@ -244,13 +248,15 @@ void loop() {
     if (req.indexOf("/H" + String(randNumber)) != -1) {
       resp = "";
       resp += "1";
-      val = 1;
+      val = 0;
+      digitalWrite(2, val);
       Serial.println("H\n");
     }
     else if (req.indexOf("/L" + String(randNumber)) != -1) {
       resp = "";
       resp += "0";
-      val = 0;
+      val = 1;
+      digitalWrite(2, val);
       Serial.println("L\n");
     }
     else if (req.indexOf("/c" + String(randNumber)) != -1) {
@@ -274,7 +280,7 @@ void loop() {
     }
     else if (req.indexOf("/o") != -1) {
       resp = "";
-      resp += (val) ? "1" : "0";
+      resp += (val) ? "0" : "1";
       Serial.println("L\n");
     }
     else {
