@@ -1,16 +1,14 @@
-/*
-    This sketch demonstrates how to set up a simple HTTP-like server.
-    The server will set a GPIO pin depending on the request
-      http://server_ip/gpio/0 will set the GPIO2 low,
-      http://server_ip/gpio/1 will set the GPIO2 high
-    server_ip is the IP address of the ESP8266 module, will be
-    printed to Serial when the module is connected.
-*/
+//FUNCIONANDO 06/10/16 01:55
+
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 String ip = "";
 String resp = "";
 String teste = "";
+
+boolean ext_url = false;
+
+String readString;
 
 int val = 0;
 
@@ -26,7 +24,9 @@ String npassword = "";
 
 int modo = 0;
 
-const char* host = "intelihome.redirectme.net";
+const char* host = "192.168.25.18";
+const char* host_ext = "intelihome.redirectme.net";
+
 
 unsigned long prev = 0; // last time update
 long intervalo = 120000;
@@ -38,16 +38,23 @@ void checkCon() {
     prev = cur;
     sendCom();
     if (WiFi.status() != WL_CONNECTED)ESP.restart();
-    else Serial.println("Ainda conectado..");
+    else Serial.println(".");
   }
 }
 
 void sendCom() {
   WiFiClient sender;
   const int httpPort = 80;
-  if (!sender.connect(host, httpPort)) {
-    Serial.println("connection failed");
-    //return;
+  if (ext_url) {
+    if (!sender.connect(host_ext, httpPort)) {
+      //Serial.println("connection failed");
+      return;
+    }
+  } else {
+    if (!sender.connect(host, httpPort)) {
+      //Serial.println("connection failed");
+      return;
+    }
   }
   String url = String(randNumber);
   url += " - ";
@@ -151,10 +158,10 @@ void setup() {
         Serial.print(".");
       }
     }
-    Serial.println("Conectado ao roteador !");
+    //Serial.println("Conectado ao roteador !");
   }
   server.begin();
-  Serial.println("Server started");
+  //Serial.println("Server started");
 
   // Print the IP address
   //Serial.println(WiFi.localIP());
@@ -165,30 +172,67 @@ void loop() {
   WiFiClient client = server.available();
   if (!client) {
     checkCon();
-    if (Serial.available()) {
-      teste = "";
+    while (Serial.available()) {
+      delay(3);
+      char c = Serial.read();
+      readString += c;
+    }
+    readString.trim();
+    if (readString.length() > 0) {
+      if (readString == "H") {
+        val = 1;
+      }
+      if (readString == "L")
+      {
+        val = 0;
+      }
+      if (readString == "Z")
+      {
+        EEPROM.write(0,'0');
+        EEPROM.commit();
+        ESP.restart();
+      }
+      if (readString == "X")
+      {
+        ext_url = true;
+      }
+      if (readString == "Y")
+      {
+        ext_url = false;
+      }
+
+      readString = "";
+    }
+    /*if (Serial.available()) {
       while (Serial.available()) {
+        delay(1);
         teste += char(Serial.read());
       }
+      teste.trim();
       //Serial.println(teste);
-    } if (teste == "Z") {
+      } if (teste == "Z") {
       EEPROM.write(0, '0');
       EEPROM.commit();
       ESP.restart();
       teste = "";
-    }
+      }
+      if (teste == "H") {
+      val = 1;
+      } if (teste == "L") {
+      val = 0;
+      }
+      teste = "";*/
     return;
   }
 
   // Wait until the client sends some data
-  Serial.println("new client");
+  //Serial.println("..");
   while (!client.available()) {
     delay(1);
   }
-
   // Read the first line of the request
   String req = client.readStringUntil('\r');
-  Serial.println(req);
+  //Serial.println(req);
   client.flush();
 
   // Match the request
@@ -199,13 +243,13 @@ void loop() {
         nssid += req[i];
       }
       nssid.trim();
-      Serial.println(nssid);
+      //Serial.println(nssid);
       int pos = req.indexOf("&") + 1;
       for (int i = pos; i < req.length(); i++) {
         npassword += req[i];
       }
       npassword.trim();
-      Serial.println(npassword);
+      //Serial.println(npassword);
       WiFi.begin(nssid.c_str(), npassword.c_str());
       int times = millis();
       while (WiFi.status() != WL_CONNECTED) {
@@ -215,7 +259,7 @@ void loop() {
         if (millis() - times > 500) {
           times = millis();
           //ESP.restart();
-          Serial.print(".");
+          //Serial.print(".");
         }
       }
       putEEPROMWiFi(nssid, npassword);
@@ -236,7 +280,7 @@ void loop() {
       EEPROMWritelong(1, randNumber);
     }
     else {
-      Serial.println("invalid request");
+      // Serial.println("invalid request");
       client.stop();
       return;
     }
@@ -245,13 +289,13 @@ void loop() {
       resp = "";
       resp += "1";
       val = 1;
-      Serial.println("H\n");
+      Serial.print("H");
     }
     else if (req.indexOf("/L" + String(randNumber)) != -1) {
       resp = "";
       resp += "0";
       val = 0;
-      Serial.println("L\n");
+      Serial.print("L");
     }
     else if (req.indexOf("/c" + String(randNumber)) != -1) {
       int index = req.indexOf("/c" + String(randNumber));
@@ -275,10 +319,12 @@ void loop() {
     else if (req.indexOf("/o") != -1) {
       resp = "";
       resp += (val) ? "1" : "0";
-      Serial.println("L\n");
+    }
+    else if (req.indexOf("/X" + String(randNumber)) != -1) {
+      ext_url = true;
     }
     else {
-      Serial.println("invalid request");
+      //Serial.println("invalid request");
       client.stop();
       return;
     }
@@ -294,7 +340,7 @@ void loop() {
     s = ip;
     client.print(s);
     delay(1);
-    Serial.println("Disc");
+    //Serial.println("Disc");
     WiFi.mode(WIFI_STA);
     modo = 1;
     conn = false;
@@ -302,7 +348,6 @@ void loop() {
     s = resp;
     client.print(s);
     delay(1);
-    Serial.println("No client");
   }
   // Send the response to the client
 

@@ -6,7 +6,11 @@ Utilizando a bibliteca:
 ##Funcionando
 
 -Pasta ESP_WebServer_ATMEGA: Código principal para ESP8266(compilado utilizando IDE do arduino).<br />
--Pasta ATMEGA_NEW/ATMEGA: Código para atmega328, parte do touch.<br />
+-Pasta ATMEGA: Código para atmega328, parte do touch.<br />
+
+##Desenvolvimento
+
+Otimização da placa InteliTiny: Touch ainda com problemas !!.
 
 ##TODO
 

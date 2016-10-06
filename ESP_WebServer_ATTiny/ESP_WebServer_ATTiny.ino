@@ -1,28 +1,48 @@
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
+
+//-----Funções:
+
+//ip: ip da conexão local(roteador).
+//resp: Resposta ao pedido.
 String ip = "";
 String resp = "";
 String teste = "";
 
+//val: 1=desligado, 0=ligado. Essa configuração é devido a
+//forma que a placa foi montada(válido para attiny).
 int val = 1;
 
+//Lê a entrada serial.
+String readString;
+
+//ssid e senha do AP.
 const char* ssid = "InteliHome";
 const char* password = "12345678";
 
+//Nûmero de identificação de cada módulo.
+//É gerado durante o modo 1.
 int randNumber = 0;
 
+//Impede envio de pacotes de conexão.
 boolean conn = false;
 
+//ssid e senha da rede local(roteador).
 String nssid = "";
 String npassword = "";
 
+//Modo de operação: 0=Configuração, 1=Ready_to_play !.
 int modo = 0;
 
+//Informações do servidor: apenas para log.
 const char* host = "192.168.25.18";
+const char* host_ext = "intelihome.redirectme.net";
 
-unsigned long prev = 0; // last time update
+//Usado para calcular intervalo de update de conexão.
+unsigned long prev = 0;
 long intervalo = 120000;
 
+//checkCon(): Verifica conexão em cada intervalo de tempo.
 void checkCon() {
   unsigned long cur = millis();
   char stats = '0';
@@ -30,24 +50,34 @@ void checkCon() {
     prev = cur;
     sendCom();
     if (WiFi.status() != WL_CONNECTED)ESP.restart();
-    else Serial.println("Ainda conectado..");
+    else Serial.println(".");
   }
 }
 
+//sendCom(): Envia informações para o servidor.
 void sendCom() {
   WiFiClient sender;
   const int httpPort = 80;
-  if (!sender.connect(host, httpPort)) {
-    Serial.println("connection failed");
-    //return;
+  if (ext_url) {
+    if (!sender.connect(host_ext, httpPort)) {
+      //Serial.println("connection failed");
+      return;
+    }
+  } else {
+    if (!sender.connect(host, httpPort)) {
+      //Serial.println("connection failed");
+      return;
+    }
   }
   String url = String(randNumber);
   url += " - ";
   url += (val) ? "0" : "1";
   sender.print(url);
   sender.stop();
+
 }
 
+//EEPROMWritelong(): Escreve long ou int na memória EEMPROM.
 void EEPROMWritelong(int address, long value) {
   byte four = (value & 0xFF);
   byte three = ((value >> 8) & 0xFF);
@@ -61,6 +91,7 @@ void EEPROMWritelong(int address, long value) {
   EEPROM.commit();
 }
 
+//EEPROMReadlong(): Lê long ou int da memória EEPROM.
 long EEPROMReadlong(long address) {
   long four = EEPROM.read(address);
   long three = EEPROM.read(address + 1);
@@ -70,6 +101,7 @@ long EEPROMReadlong(long address) {
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
 
+//putEEPROMWiFi(): Coloca as informações de WIFI na EEPROM.
 void putEEPROMWiFi(String _ssid, String _password) {
   for (int i = 0; i < _ssid.length(); i++) {
     EEPROM.write(i + 10, _ssid.charAt(i));
@@ -81,6 +113,8 @@ void putEEPROMWiFi(String _ssid, String _password) {
   EEPROM.write(_password.length() + 100, '&');
   EEPROM.commit();
 }
+
+//readEEPROMWiFi(): Lê as informações de WIFI da EEPROM.
 void readEEPROMWiFi() {
   for (int i = 0; EEPROM.read(i + 10) != '&'; i++) {
     nssid += (char)EEPROM.read(i + 10);
@@ -90,6 +124,7 @@ void readEEPROMWiFi() {
   }
 }
 
+//ipToString(): Converte im endereço de IP para String.
 String ipToString(IPAddress ip) {
   String s = "";
   for (int i = 0; i < 4; i++) {
@@ -99,12 +134,17 @@ String ipToString(IPAddress ip) {
   return s;
 }
 
-// Create an instance of the server
-// specify the port to listen on as an argument
+//Aqui acaba as funções e começa o código em si.
+
+//------The_Brain:
+
+//Declarando servidor: porta 5566 padrão.
 WiFiServer server(5566);
 
 void setup() {
+  //Desconecta de todas as redes(AP e STA).
   WiFi.disconnect();
+  //Inicia EEPROM e Serial.
   Serial.begin(9600);
   EEPROM.begin(512);
   //EEPROM.write(0,'0');
@@ -114,29 +154,35 @@ void setup() {
   if (EEPROM.read(0) == (char)'0')modo = 0;
   if (EEPROM.read(0) == (char)'1')modo = 1;
 
-  // prepare GPIO2
+  // prepara GPIO2(controle da luz).
   pinMode(2, OUTPUT);
   val = 1;
   digitalWrite(2, val);
 
-  // Connect to WiFi network
+  //Aqui o modo define o que o módulo está fazendo:
   if (modo == 0) {
+    //Modo de configuração.
     WiFi.mode(WIFI_AP_STA);
+    //Prints só para verificação no console(não são necessaários).
     Serial.println();
     Serial.println();
     Serial.print("AP: ");
     Serial.println(ssid);
-
+    //Inicia o AP(SSID: InteliHome, SENHA: 12345678).
     WiFi.softAP(ssid, password);
     Serial.println("");
     Serial.println("AP Criado !");
   } else if (modo == 1) {
+    //Modo normal(operação).
+    //Lê as informações de WIFI da EEPROM. Tambem o identificador (randNumber).
     randNumber = EEPROMReadlong(1);
     readEEPROMWiFi();
     delay(10);
+    //Inicia STA(conezão com roteador).
     WiFi.begin(nssid.c_str(), npassword.c_str());
     int times = millis();
     while (WiFi.status() != WL_CONNECTED) {
+      //Espera até que a conexão seja estabelecida.
       delay(1);
       if (millis() - times > 500) {
         times = millis();
@@ -144,58 +190,79 @@ void setup() {
         Serial.print(".");
       }
     }
-    Serial.println("Conectado ao roteador !");
+    //Serial.println("\nConectado ao roteador !");
+    // Print the IP address
+    //Serial.println(WiFi.localIP());
   }
+  //Inicia o servidor.
   server.begin();
-  Serial.println("Server started");
+  //Serial.println("Server started");
 
-  // Print the IP address
-  //Serial.println(WiFi.localIP());
+
 }
 
 void loop() {
-  // Check if a client has connected
+  //Verifica se existe conexão com algum cliente.
   WiFiClient client = server.available();
   if (!client) {
+    //Isso acontece enquanto não existe nenhuma conexão..
+    //Aqui nós checamos a conexão com o roteador e ficamos ouvido por
+    //atualizações no Serial.
     checkCon();
-    if (Serial.available()) {
-      teste = "";
-      while (Serial.available()) {
-        teste += char(Serial.read());
+    while (Serial.available()) {
+      delay(3);
+      char c = Serial.read();
+      readString += c;
+    }
+    readString.trim();
+    if (readString.length() > 0) {
+      if (readString == "H") {
+        //Ativa luz pelo serial.
+        val = 0;
+        digitalWrite(2, val);
       }
-    }
-    //Serial.println(teste);
-    if (teste == "H") {
-      val = 0;
-      digitalWrite(2, val);
-      teste = "";
-    }
-    if (teste == "L") {
-      val = 1;
-      digitalWrite(2, val);
-      teste = "";
-    }
-    if (teste == "Z") {
-      EEPROM.write(0, '0');
-      EEPROM.commit();
-      ESP.restart();
-      teste = "";
+      if (readString == "L")
+      {
+        //Desativa luz pelo serial.
+        val = 1;
+        digitalWrite(2, val);
+      }
+      if (readString == "Z")
+      {
+        //Apaga dados e reseta;
+        EEPROM.write(0, '0');
+        EEPROM.commit();
+        ESP.restart();
+      }
+      if (readString == "X")
+      {
+        ext_url = true;
+      }
+      if (readString == "Y")
+      {
+        ext_url = false;
+      }
+
+      readString = "";
     }
     return;
   }
 
-  // Wait until the client sends some data
-  Serial.println("new client");
+  //A partir daqui já existe uma conexão, mas nenhum dado foi recebido ainda.
+  
+  //Serial.println("..");
   while (!client.available()) {
     delay(1);
   }
 
-  // Read the first line of the request
+  //Dados recebidos..
+  //Vamos ler eles e interpretar.
+
   String req = client.readStringUntil('\r');
   Serial.println(req);
   client.flush();
 
-  // Match the request
+  //Outra separação e configuração e operação.
 
   if (modo == 0) {
     if (req.indexOf("&") != -1) {
@@ -240,7 +307,7 @@ void loop() {
       EEPROMWritelong(1, randNumber);
     }
     else {
-      Serial.println("invalid request");
+      //Serial.println("invalid request");
       client.stop();
       return;
     }
@@ -250,14 +317,14 @@ void loop() {
       resp += "1";
       val = 0;
       digitalWrite(2, val);
-      Serial.println("H\n");
+      Serial.println("H");
     }
     else if (req.indexOf("/L" + String(randNumber)) != -1) {
       resp = "";
       resp += "0";
       val = 1;
       digitalWrite(2, val);
-      Serial.println("L\n");
+      Serial.println("L");
     }
     else if (req.indexOf("/c" + String(randNumber)) != -1) {
       int index = req.indexOf("/c" + String(randNumber));
@@ -281,7 +348,6 @@ void loop() {
     else if (req.indexOf("/o") != -1) {
       resp = "";
       resp += (val) ? "0" : "1";
-      Serial.println("L\n");
     }
     else {
       Serial.println("invalid request");
@@ -308,7 +374,7 @@ void loop() {
     s = resp;
     client.print(s);
     delay(1);
-    Serial.println("No client");
+    //Serial.println(".");
   }
   // Send the response to the client
 
